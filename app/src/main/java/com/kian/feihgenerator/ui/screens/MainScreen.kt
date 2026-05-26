@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material.icons.filled.Star
@@ -715,12 +716,19 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
                         HorizontalDivider()
                         Text("第四步：文字配置", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                         OutlinedTextField(
-                            value = heroViewModel.heroText, 
-                            onValueChange = { heroViewModel.heroText = it }, 
-                            label = { Text("输入标题内容") }, 
+                            value = heroViewModel.heroText,
+                            onValueChange = { heroViewModel.heroText = it },
+                            label = { Text("输入标题内容") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done).copy(platformImeOptions = PlatformImeOptions("android:imeOptions=flagNoExtractUi")),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                            singleLine = false,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default).copy(platformImeOptions = PlatformImeOptions("android:imeOptions=flagNoExtractUi")),
+                            trailingIcon = {
+                                if (heroViewModel.heroText.isNotEmpty()) {
+                                    IconButton(onClick = { focusManager.clearFocus() }) {
+                                        Icon(imageVector = Icons.Default.Done, contentDescription = "收起键盘")
+                                    }
+                                }
+                            }
                         )
 
                         FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
