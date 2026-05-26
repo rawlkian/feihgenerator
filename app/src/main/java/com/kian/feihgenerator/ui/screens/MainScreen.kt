@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -80,7 +82,6 @@ enum class AppScreen {
 @Composable
 fun MainScreen() {
     var currentScreen by remember { mutableStateOf(AppScreen.WELCOME) }
-    val context = LocalContext.current
 
     val iconViewModel: IconGenViewModel = viewModel()
     val heroViewModel: HeroGenViewModel = viewModel()
@@ -128,11 +129,16 @@ fun WelcomeLandingScreen(onNavigateToIcon: () -> Unit, onNavigateToHero: () -> U
         }
 
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 50.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 20.dp)) {
                 Box(modifier = Modifier.size(80.dp).background(Brush.linearGradient(listOf(Color(0xFF3B82F6), Color(0xFFEF4444))), shape = RoundedCornerShape(22.dp)).padding(2.dp)) {
                     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F172A), shape = RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(36.dp), tint = Color.White)
@@ -148,12 +154,12 @@ fun WelcomeLandingScreen(onNavigateToIcon: () -> Unit, onNavigateToHero: () -> U
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 30.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(text = "请选择要使用的功能：", fontSize = 12.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
                 WelcomeEngineCard(title = "Icon Generator", description = "选取应用图标、调配纯色/自选背景，高度定制无损 1024x1024 圆角方形图标。", icon = Icons.Filled.AccountBox, accentColor = Color(0xFF2196F3), onClick = onNavigateToIcon)
                 WelcomeEngineCard(title = "Hero Generator", description = "依照模板通过简单的操作生成美观的Hero图，支持泛光多行艺术字与 360° 旋转装饰贴图。", icon = Icons.Filled.Star, accentColor = Color(0xFFFF9800), onClick = onNavigateToHero)
             }
-            Text(text = "Made by Kian", fontSize = 11.sp, color = Color(0xFF475569), modifier = Modifier.padding(bottom = 4.dp))
+            Text(text = "Made by Kian", fontSize = 11.sp, color = Color(0xFF475569), modifier = Modifier.padding(bottom = 12.dp))
         }
     }
 }
@@ -209,23 +215,27 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
         }
     }
 
+    val previewBorderWidth = with(density) { (viewModel.borderWidth * (previewComponentSizePx / 1024f)).toDp() }
+    val previewCornerRadius = with(density) { (70f * (previewComponentSizePx / 1024f)).toDp() }
+
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(modifier = Modifier.fillMaxHeight().weight(0.9f).background(Color.White).padding(24.dp), contentAlignment = Alignment.Center) {
             Card(
                 modifier = Modifier.fillMaxHeight(0.85f).aspectRatio(1f).onGloballyPositioned { previewComponentSizePx = it.size.width.toFloat() },
-                shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent), elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                shape = RoundedCornerShape(previewCornerRadius), colors = CardDefaults.cardColors(containerColor = Color.Transparent), elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize()
+                        .clip(RoundedCornerShape(previewCornerRadius))
                         .background(if (viewModel.backgroundType == 0) Color(viewModel.backgroundColor.toInt()) else Color.Transparent)
                         .border(
-                            width = if (viewModel.borderType == 3) 0.dp else viewModel.borderWidth.dp,
+                            width = if (viewModel.borderType == 3) 0.dp else previewBorderWidth,
                             brush = when (viewModel.borderType) {
                                 1 -> Brush.linearGradient(listOf(Color.Cyan, Color.Magenta, Color.Yellow))
                                 2 -> Brush.linearGradient(listOf(Color(viewModel.gradientStartColor.toInt()), Color(viewModel.gradientEndColor.toInt())))
                                 else -> Brush.linearGradient(listOf(Color(viewModel.borderColor.toInt()), Color(viewModel.borderColor.toInt())))
                             },
-                            shape = RoundedCornerShape(24.dp)
+                            shape = RoundedCornerShape(previewCornerRadius)
                         )
                         .pointerInput(Unit) {
                             detectTransformGestures { _, pan, zoom, _ ->
@@ -299,12 +309,12 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
                 }
                 item {
                     if (viewModel.borderType != 3) {
-                        Text("边框发光粗细微调 (${viewModel.borderWidth.toInt()} dp)")
-                        Slider(value = viewModel.borderWidth, onValueChange = { viewModel.borderWidth = it }, valueRange = 2f..30f)
+                        Text("边框发光粗细微调 (${viewModel.borderWidth.toInt()} px)")
+                        Slider(value = viewModel.borderWidth, onValueChange = { viewModel.borderWidth = it }, valueRange = 4f..150f)
                     }
                 }
                 item {
-                    Button(onClick = { with(density) { viewModel.saveCombinedIconToGallery(context, previewComponentSizePx, viewModel.borderWidth.dp.toPx(), 24.dp.toPx()) } }, modifier = Modifier.fillMaxWidth(), enabled = viewModel.selectedBaseIconSource != null, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                    Button(onClick = { viewModel.saveCombinedIconToGallery(context, previewComponentSizePx) }, modifier = Modifier.fillMaxWidth(), enabled = viewModel.selectedBaseIconSource != null, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
                         Text("导出 1024x1024 物理 Icon", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }

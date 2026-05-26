@@ -2,7 +2,6 @@ package com.kian.feihgenerator
 
 import android.content.ContentValues
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
@@ -65,7 +64,7 @@ class IconGenViewModel : ViewModel() {
     // --- 边框相关状态 ---
     var borderType by mutableStateOf(0)
     var borderColor by mutableStateOf(0xFF102A10L)
-    var borderWidth by mutableStateOf(14f)
+    var borderWidth by mutableStateOf(40f) // 1024 物理像素坐标下的宽度，初始建议 40px
 
     var gradientStartColor by mutableStateOf(0xFFFF0000L)
     var gradientEndColor by mutableStateOf(0xFF0000FFL)
@@ -111,24 +110,30 @@ class IconGenViewModel : ViewModel() {
             isLoadingApps = true
             val apps = withContext(Dispatchers.IO) {
                 val pm = context.packageManager
-                val allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                allApps.filter { app ->
-                    (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0 || pm.getLaunchIntentForPackage(app.packageName) != null
-                }.map { app ->
+                val intent = android.content.Intent(android.content.Intent.ACTION_MAIN, null).apply {
+                    addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+                }
+                val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0L))
+                } else {
+                    pm.queryIntentActivities(intent, 0)
+                }
+
+                resolveInfos.map { info ->
                     AppInfo(
-                        label = app.loadLabel(pm).toString(),
-                        packageName = app.packageName,
-                        icon = app.loadIcon(pm)
+                        label = info.loadLabel(pm).toString(),
+                        packageName = info.activityInfo.packageName,
+                        icon = info.loadIcon(pm)
                     )
-                }.sortedBy { it.label }
+                }.distinctBy { it.packageName }.sortedBy { it.label }
             }
             installedApps = apps
             isLoadingApps = false
         }
     }
 
-    // 1024x1024 离屏合成入库：同步换算你在背景上进行的手势平移移动与捏合缩放系数
-    fun saveCombinedIconToGallery(context: Context, viewSizePx: Float, borderWidthPx: Float, cornerRadiusPx: Float) {
+    // 1024x1024 离屏合成入库：使用固定物理像素比例，不再依赖预览窗口大小
+    fun saveCombinedIconToGallery(context: Context, viewSizePx: Float) {
         viewModelScope.launch {
             val success = withContext(Dispatchers.IO) {
                 try {
@@ -138,31 +143,29 @@ class IconGenViewModel : ViewModel() {
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
                     val rectF = RectF(0f, 0f, targetSize.toFloat(), targetSize.toFloat())
 
-                    val scaleFactor = targetSize.toFloat() / viewSizePx
-                    val strokeW = borderWidthPx * scaleFactor
-                    val cornerRadius = cornerRadiusPx * scaleFactor
+                    // 边框宽度直接使用 ViewModel 维护的物理像素值
+                    val strokeW = borderWidth
+                    // 圆角计算：还原为用户初始的 24.dp 视觉比例
+                    // 1024 * (24 / 360) ≈ 68.2px，取整为 70px 保证视觉一致性
+                    val finalCornerRadius = 70f
 
                     val layerCode = canvas.saveLayer(0f, 0f, targetSize.toFloat(), targetSize.toFloat(), null)
 
-                    // 先平铺基础背景色
+                    // 1. 先平铺基础背景色
                     paint.color = backgroundColor.toInt()
                     canvas.drawRect(rectF, paint)
 
-                    // 🛠 核心微调映射：自选背景大图在此处同步承载你的手势偏移量（bgOffsetX/Y 和 bgScale）
+                    // 2. 🛠 核心微调映射：自选背景大图在此处同步承载你的手势偏移量
                     if (backgroundType == 2 && croppedBackgroundBitmap != null) {
                         canvas.save()
-                        // 映射你在屏幕预览区通过单指移动创造的偏置量
-                        canvas.translate(bgOffsetX * scaleFactor, bgOffsetY * scaleFactor)
+                        val scaleTo1024 = targetSize.toFloat() / viewSizePx
+                        canvas.translate(bgOffsetX * scaleTo1024, bgOffsetY * scaleTo1024)
 
                         val bgW = croppedBackgroundBitmap!!.width.toFloat()
                         val bgH = croppedBackgroundBitmap!!.height.toFloat()
-
-                        // 🛠 核心修正：移除错误的命名参数 maximumValue，改用标准的纯参数对比，彻底杀掉 159 行报错
-                        val initBgScale = targetSize.toFloat() / bgW.coerceAtMost(bgH)
-
-                        // 叠加你在屏幕预览区通过双指捏合创造的缩放系数
+                        val initBgScale = targetSize.toFloat() / Math.min(bgW, bgH)
                         val finalBgScale = initBgScale * bgScale
-                        canvas.scale(finalBgScale, finalBgScale) // 显式匹配两轴等比
+                        canvas.scale(finalBgScale, finalBgScale)
 
                         val drawBgX = (targetSize / finalBgScale - bgW) / 2f
                         val drawBgY = (targetSize / finalBgScale - bgH) / 2f
@@ -170,14 +173,14 @@ class IconGenViewModel : ViewModel() {
                         canvas.restore()
                     }
 
-                    // 基础主体图标回到原位：100% 居中，不再受用户手势拖动干扰
+                    // 3. 基础主体图标回到原位：模仿 ContentScale.Fit 行为
                     selectedBaseIconSource?.let { source ->
                         var srcBitmap: Bitmap? = null
                         if (source is Drawable) {
                             if (source is BitmapDrawable) {
                                 srcBitmap = source.bitmap
                             } else {
-                                val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+                                val bmp = Bitmap.createBitmap(source.intrinsicWidth.coerceAtLeast(100), source.intrinsicHeight.coerceAtLeast(100), Bitmap.Config.ARGB_8888)
                                 val dCanvas = Canvas(bmp)
                                 source.setBounds(0, 0, dCanvas.width, dCanvas.height)
                                 source.draw(dCanvas)
@@ -189,14 +192,23 @@ class IconGenViewModel : ViewModel() {
                         }
 
                         srcBitmap?.let { baseBmp ->
-                            val iconTargetSize = (targetSize * iconScale).toInt()
-                            val scaledIcon = Bitmap.createScaledBitmap(baseBmp, iconTargetSize, iconTargetSize, true)
-                            val left = (targetSize - iconTargetSize) / 2f
-                            val top = (targetSize - iconTargetSize) / 2f
-                            canvas.drawBitmap(scaledIcon, left, top, paint)
+                            val iconAreaSize = targetSize * iconScale
+                            
+                            val srcW = baseBmp.width.toFloat()
+                            val srcH = baseBmp.height.toFloat()
+                            val scale = Math.min(iconAreaSize / srcW, iconAreaSize / srcH)
+                            val drawW = srcW * scale
+                            val drawH = srcH * scale
+                            
+                            // 严谨居中对齐：直接基于 targetSize 计算，确保与预览对齐
+                            val drawLeft = (targetSize - drawW) / 2f
+                            val drawTop = (targetSize - drawH) / 2f
+                            
+                            canvas.drawBitmap(baseBmp, null, RectF(drawLeft, drawTop, drawLeft + drawW, drawTop + drawH), paint)
                         }
                     }
 
+                    // 4. 绘制边框
                     if (borderType == 3 && userBorderBitmap != null) {
                         paint.style = Paint.Style.FILL
                         paint.shader = null
@@ -221,13 +233,14 @@ class IconGenViewModel : ViewModel() {
                                 paint.color = borderColor.toInt()
                             }
                         }
-                        canvas.drawRoundRect(borderRect, cornerRadius - strokeW / 2f, cornerRadius - strokeW / 2f, paint)
+                        canvas.drawRoundRect(borderRect, finalCornerRadius - strokeW / 2f, finalCornerRadius - strokeW / 2f, paint)
                     }
 
+                    // 5. 应用圆角遮罩 (Clipping)
                     val maskBitmap = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
                     val maskCanvas = Canvas(maskBitmap)
                     val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
-                    maskCanvas.drawRoundRect(rectF, cornerRadius, cornerRadius, maskPaint)
+                    maskCanvas.drawRoundRect(rectF, finalCornerRadius, finalCornerRadius, maskPaint)
 
                     paint.style = Paint.Style.FILL
                     paint.shader = null
