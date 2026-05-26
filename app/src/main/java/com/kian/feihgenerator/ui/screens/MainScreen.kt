@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint
-import android.graphics.Typeface as AndroidTypeface
 import android.graphics.Path as AndroidPath
 import android.graphics.RectF as AndroidRectF
 import android.graphics.PorterDuff
@@ -99,7 +98,7 @@ fun MainScreen() {
                     TopAppBar(
                         title = {
                             Text(
-                                text = if (currentScreen == AppScreen.ICON_GENERATOR) "前端图标生成工具" else "Hero图生成工具",
+                                text = if (currentScreen == AppScreen.ICON_GENERATOR) "Icon Generator" else "Hero Generator",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -197,9 +196,9 @@ fun WelcomeLandingScreen(
             }
 
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = "请选择要使用的功能：", fontSize = 12.sp, color = subTextColor, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
-                WelcomeEngineCard(title = "Icon Generator", description = "选取应用图标、调配纯色/自选背景，高度定制无损 1024x1024 圆角方形图标。", icon = Icons.Filled.AccountBox, accentColor = Color(0xFF2196F3), onClick = onNavigateToIcon, isDark = isDark)
-                WelcomeEngineCard(title = "Hero Generator", description = "依照模板通过简单的操作生成美观的Hero图，支持泛光多行艺术字与 360° 旋转装饰贴图。", icon = Icons.Filled.Star, accentColor = Color(0xFFFF9800), onClick = onNavigateToHero, isDark = isDark)
+                Text(text = "请选择功能模块：", fontSize = 12.sp, color = subTextColor, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+                WelcomeEngineCard(title = "Icon Generator", description = "为App生成风格统一的圆角矩形图标，固定导出为1024 × 1024像素大小。", icon = Icons.Filled.AccountBox, accentColor = Color(0xFF2196F3), onClick = onNavigateToIcon, isDark = isDark)
+                WelcomeEngineCard(title = "Hero Generator", description = "通过简单的操作，依照模板生成美观的Hero图，支持额外添加文字与Deco图饰。", icon = Icons.Filled.Star, accentColor = Color(0xFFFF9800), onClick = onNavigateToHero, isDark = isDark)
             }
             Text(text = "Made by Kian", fontSize = 11.sp, color = subTextColor.copy(alpha = 0.7f), modifier = Modifier.padding(bottom = 12.dp))
         }
@@ -266,7 +265,7 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
     var isEditingStartColor by remember { mutableStateOf(true) }
 
     var hexLocalText by remember { mutableStateOf("") }
-    var previewComponentSizePx by remember { mutableStateOf(0f) }
+    var previewComponentSizePx by remember { mutableIntStateOf(0) }
 
     val baseIconLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.selectedBaseIconSource = it; viewModel.isUserCustomIcon = true }
@@ -284,13 +283,13 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isLandscape = maxWidth > maxHeight && maxWidth > 600.dp
-        val previewBorderWidth = with(density) { (viewModel.borderWidth * (previewComponentSizePx / 1024f)).toDp() }
-        val previewCornerRadius = with(density) { (70f * (previewComponentSizePx / 1024f)).toDp() }
+        val previewBorderWidth = with(density) { (viewModel.borderWidth * (previewComponentSizePx.toFloat() / 1024f)).toDp() }
+        val previewCornerRadius = with(density) { (70f * (previewComponentSizePx.toFloat() / 1024f)).toDp() }
 
         val previewContent = @Composable {
             Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 Card(
-                    modifier = Modifier.fillMaxHeight(if (isLandscape) 0.85f else 0.7f).aspectRatio(1f).onGloballyPositioned { previewComponentSizePx = it.size.width.toFloat() },
+                    modifier = Modifier.fillMaxHeight(if (isLandscape) 0.85f else 0.7f).aspectRatio(1f).onGloballyPositioned { previewComponentSizePx = it.size.width },
                     shape = RoundedCornerShape(previewCornerRadius), colors = CardDefaults.cardColors(containerColor = Color.Transparent), elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Box(
@@ -334,22 +333,22 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
         val controlsContent = @Composable {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 item {
-                    Text("第一步：选取基础主体图标", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("第一步：选取顶层图标", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                         Button(onClick = { viewModel.loadInstalledApps(context); showAppListDialog = true }) { Text("应用选择器") }
                         FilterChip(selected = viewModel.isUserCustomIcon, onClick = { baseIconLauncher.launch("image/*") }, label = { Text("用户自定义") })
                     }
                 }
                 item {
-                    Text("前排图标规格微调 (${(viewModel.iconScale * 100).toInt()}%)", style = MaterialTheme.typography.bodyMedium)
+                    Text("调整顶层图标大小 (${(viewModel.iconScale * 100).toInt()}%)", style = MaterialTheme.typography.bodyMedium)
                     Slider(value = viewModel.iconScale, onValueChange = { viewModel.iconScale = it }, valueRange = 0.4f..1.0f)
                 }
                 item {
                     HorizontalDivider()
-                    Text("第二步：底图背景设置", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("第二步：背景底图设置", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                         FilterChip(selected = viewModel.backgroundType == 0, onClick = { viewModel.backgroundType = 0 }, label = { Text("纯色背景") })
-                        FilterChip(selected = viewModel.backgroundType == 2, onClick = { bgImageLauncher.launch("image/*") }, label = { Text("用户自选背景") })
+                        FilterChip(selected = viewModel.backgroundType == 2, onClick = { bgImageLauncher.launch("image/*") }, label = { Text("用户自定义") })
                     }
                     if (viewModel.backgroundType == 0) {
                         Button(onClick = { hexLocalText = String.format("%06X", viewModel.backgroundColor and 0xFFFFFFL); showColorPickerDialog = true }, modifier = Modifier.padding(top = 8.dp)) { Text("配置自定义纯色") }
@@ -357,12 +356,12 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
                 }
                 item {
                     HorizontalDivider()
-                    Text("第三步：图标边框形态设置", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("第三步：边框形态设置", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        FilterChip(selected = viewModel.borderType == 0, onClick = { viewModel.borderType = 0 }, label = { Text("自选纯色框") })
-                        FilterChip(selected = viewModel.borderType == 1, onClick = { viewModel.borderType = 1 }, label = { Text("霓虹渐变边") })
-                        FilterChip(selected = viewModel.borderType == 2, onClick = { viewModel.borderType = 2 }, label = { Text("自选双色渐变") })
-                        FilterChip(selected = viewModel.borderType == 3, onClick = { showBorderNoticeDialog = true }, label = { Text("用户自选PNG") })
+                        FilterChip(selected = viewModel.borderType == 0, onClick = { viewModel.borderType = 0 }, label = { Text("纯色边框") })
+                        FilterChip(selected = viewModel.borderType == 1, onClick = { viewModel.borderType = 1 }, label = { Text("霓虹渐变") })
+                        FilterChip(selected = viewModel.borderType == 2, onClick = { viewModel.borderType = 2 }, label = { Text("双色渐变") })
+                        FilterChip(selected = viewModel.borderType == 3, onClick = { showBorderNoticeDialog = true }, label = { Text("用户自定义") })
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         if (viewModel.borderType == 0) {
@@ -376,12 +375,12 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
                 }
                 item {
                     if (viewModel.borderType != 3) {
-                        Text("边框发光粗细微调 (${viewModel.borderWidth.toInt()} px)")
+                        Text("边框粗细调整 (${viewModel.borderWidth.toInt()} px)")
                         Slider(value = viewModel.borderWidth, onValueChange = { viewModel.borderWidth = it }, valueRange = 4f..150f)
                     }
                 }
                 item {
-                    Button(onClick = { viewModel.saveCombinedIconToGallery(context, previewComponentSizePx) }, modifier = Modifier.fillMaxWidth(), enabled = viewModel.selectedBaseIconSource != null, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                    Button(onClick = { viewModel.saveCombinedIconToGallery(context, previewComponentSizePx.toFloat()) }, modifier = Modifier.fillMaxWidth(), enabled = viewModel.selectedBaseIconSource != null, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
                         Text("导出图标", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
@@ -406,17 +405,17 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
     }
 
     if (showBorderNoticeDialog) {
-        AlertDialog(onDismissRequest = { showBorderNoticeDialog = false }, title = { Text("自选 PNG 边框提示") }, text = { Text("请选择大小为1024×1024像素的边框图片。") }, confirmButton = { Button(onClick = { showBorderNoticeDialog = false; borderImageLauncher.launch("image/*") }) { Text("去选择图片") } })
+        AlertDialog(onDismissRequest = { showBorderNoticeDialog = false }, title = { Text("自选边框提示") }, text = { Text("请选择大小为1024×1024像素的边框图片。") }, confirmButton = { Button(onClick = { showBorderNoticeDialog = false; borderImageLauncher.launch("image/*") }) { Text("去选择图片") } })
     }
     if (showColorPickerDialog) {
         Dialog(onDismissRequest = { showColorPickerDialog = false }) {
             Card(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text("自定义背景纯色", fontWeight = FontWeight.Bold)
+                    Text("自定义纯色背景", fontWeight = FontWeight.Bold)
                     Slider(value = viewModel.colorPickerRed, onValueChange = { viewModel.colorPickerRed = it; viewModel.updateColorFromRGB() })
                     Slider(value = viewModel.colorPickerGreen, onValueChange = { viewModel.colorPickerGreen = it; viewModel.updateColorFromRGB() })
                     Slider(value = viewModel.colorPickerBlue, onValueChange = { viewModel.colorPickerBlue = it; viewModel.updateColorFromRGB() })
-                    OutlinedTextField(value = hexLocalText, onValueChange = { text -> hexLocalText = text; runCatching { viewModel.backgroundColor = ("FF" + text).toLong(16) } }, label = { Text("HEX代码") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = hexLocalText, onValueChange = { text -> hexLocalText = text; runCatching { viewModel.backgroundColor = "FF$text".toLong(16) } }, label = { Text("HEX代码") }, modifier = Modifier.fillMaxWidth())
                     Button(onClick = { showColorPickerDialog = false }, modifier = Modifier.align(Alignment.End).padding(top = 12.dp)) { Text("完成") }
                 }
             }
@@ -440,7 +439,7 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
         Dialog(onDismissRequest = { showGradientColorDialog = false }) {
             Card(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text(if (isEditingStartColor) "设置双色渐变 - 起点色彩" else "设置双色渐变 - 终点色彩", fontWeight = FontWeight.Bold)
+                    Text(if (isEditingStartColor) "设置渐变起点色彩" else "设置渐变终点色彩", fontWeight = FontWeight.Bold)
                     var pR by remember(isEditingStartColor) { mutableFloatStateOf(if (isEditingStartColor) ((viewModel.gradientStartColor shr 16) and 0xFFL)/255f else ((viewModel.gradientEndColor shr 16) and 0xFFL)/255f) }
                     var pG by remember(isEditingStartColor) { mutableFloatStateOf(if (isEditingStartColor) ((viewModel.gradientStartColor shr 8) and 0xFFL)/255f else ((viewModel.gradientEndColor shr 8) and 0xFFL)/255f) }
                     var pB by remember(isEditingStartColor) { mutableFloatStateOf(if (isEditingStartColor) (viewModel.gradientStartColor and 0xFFL)/255f else (viewModel.gradientEndColor and 0xFFL)/255f) }
@@ -472,8 +471,8 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
         }
     }
     if (showCropDialog && viewModel.rawBackgroundUri != null) {
-        var cropScale by remember { mutableStateOf(1f) }
-        var cropOffset by remember { mutableStateOf<androidx.compose.ui.geometry.Offset>(androidx.compose.ui.geometry.Offset.Zero) }
+        var cropScale by remember { mutableFloatStateOf(1f) }
+        var cropOffset by remember { mutableStateOf(Offset.Zero) }
         var containerSize by remember { mutableStateOf(IntSize.Zero) }
         val srcBmp = remember(viewModel.rawBackgroundUri) { runCatching { val inputStream = context.contentResolver.openInputStream(viewModel.rawBackgroundUri!!); BitmapFactory.decodeStream(inputStream) }.getOrNull() }
         Dialog(onDismissRequest = { showCropDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -502,7 +501,7 @@ fun IconGeneratorScreen(viewModel: IconGenViewModel) {
                                 }
                             }
                             showCropDialog = false
-                        }) { Text("确定引入裁剪背景", fontWeight = FontWeight.Bold) }
+                        }) { Text("确定导入背景", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
@@ -517,12 +516,12 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
     val focusManager = LocalFocusManager.current
 
     var showColorPicker by remember { mutableStateOf(false) }
-    var pickerTargetType by remember { mutableStateOf(0) }
+    var pickerTargetType by remember { mutableIntStateOf(0) }
     var hexLocalText by remember { mutableStateOf("") }
-    var previewComponentSizePx by remember { mutableStateOf(0f) }
+    var previewComponentSizePx by remember { mutableFloatStateOf(0f) }
 
-    var currentHeroTabMode by remember { mutableStateOf(0) }
-    val tabTitles = listOf("自定义模式", "预设边框模式", "无边框模式")
+    var currentHeroTabMode by remember { mutableIntStateOf(0) }
+    val tabTitles = listOf("自定义边框", "预设边框", "无边框")
 
     var showBaseCropDialog by remember { mutableStateOf(false) }
     var tempBasePhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -688,22 +687,22 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
 
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        Text("第一步：设置背景色", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("第一步：设置缺省背景", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                         Button(onClick = { pickerTargetType = 0; hexLocalText = String.format("%08X", heroViewModel.heroBackgroundColor); showColorPicker = true }, modifier = Modifier.fillMaxWidth().height(36.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(heroViewModel.heroBackgroundColor.toInt()))) { Text("调配衬底画布底色", fontSize = 12.sp, color = if(Color(heroViewModel.heroBackgroundColor.toInt()).luminance() > 0.5f) Color.Black else Color.White) }
                     }
                     item {
                         HorizontalDivider()
-                        Text("第二步：主体图片导入", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                        Button(onClick = { sharedPhotoLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text("📁 选择本地海报主体底图", fontSize = 12.sp) }
+                        Text("第二步：导入主体图片", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        Button(onClick = { sharedPhotoLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) { Text("选择Hero图主体图片", fontSize = 12.sp) }
                     }
 
                     if (currentHeroTabMode == 0) {
                         item {
                             HorizontalDivider()
-                            Text("第三步：边框调节", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("外围曲率系数 (${heroViewModel.squircleTension.toInt()} %)", fontSize = 11.sp)
+                            Text("第三步：边框形态调节", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("外围曲率 (${heroViewModel.squircleTension.toInt()} %)", fontSize = 11.sp)
                             Slider(value = heroViewModel.squircleTension, onValueChange = { heroViewModel.squircleTension = it }, valueRange = 30f..120f)
-                            Text("霓虹边缘厚度微调 (${heroViewModel.borderWidth.toInt()} dp)", fontSize = 11.sp)
+                            Text("边缘厚度 (${heroViewModel.borderWidth.toInt()} dp)", fontSize = 11.sp)
                             Slider(value = heroViewModel.borderWidth, onValueChange = { heroViewModel.borderWidth = it }, valueRange = 4f..45f)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { pickerTargetType = 1; hexLocalText = String.format("%08X", heroViewModel.heroBorderColor); showColorPicker = true }) { Text("发光色", fontSize = 11.sp) }
@@ -714,11 +713,11 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
 
                     item {
                         HorizontalDivider()
-                        Text("第四步：文字配置", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("第四步：文字详细设置", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                         OutlinedTextField(
                             value = heroViewModel.heroText,
                             onValueChange = { heroViewModel.heroText = it },
-                            label = { Text("输入标题内容") },
+                            label = { Text("输入文字内容") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = false,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default).copy(platformImeOptions = PlatformImeOptions("android:imeOptions=flagNoExtractUi")),
@@ -732,8 +731,8 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
                         )
 
                         FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { fontFileLauncher.launch("*/*") }) { Text("🔤 导入自选 ttf/otf", fontSize = 11.sp) }
-                            OutlinedButton(onClick = { heroViewModel.customTypeface = null; heroViewModel.customFontName = "系统默认字体"; Toast.makeText(context, "已恢复默认字体", Toast.LENGTH_SHORT).show() }) { Text("恢复默认字体 ↩", fontSize = 11.sp) }
+                            Button(onClick = { fontFileLauncher.launch("*/*") }) { Text("自定义字体文件", fontSize = 11.sp) }
+                            OutlinedButton(onClick = { heroViewModel.customTypeface = null; heroViewModel.customFontName = "系统默认字体"; Toast.makeText(context, "已恢复默认字体", Toast.LENGTH_SHORT).show() }) { Text("恢复默认字体", fontSize = 11.sp) }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -743,17 +742,17 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = heroViewModel.textBold, onCheckedChange = { heroViewModel.textBold = it }); Text("粗体", fontSize = 11.sp) }
                             Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = heroViewModel.textItalic, onCheckedChange = { heroViewModel.textItalic = it }); Text("斜体", fontSize = 11.sp) }
-                            Button(onClick = { pickerTargetType = 3; hexLocalText = String.format("%08X", heroViewModel.heroTextColor); showColorPicker = true }) { Text("字体主色", fontSize = 11.sp) }
+                            Button(onClick = { pickerTargetType = 3; hexLocalText = String.format("%08X", heroViewModel.heroTextColor); showColorPicker = true }) { Text("字体颜色", fontSize = 11.sp) }
                         }
                     }
 
                     item {
                         HorizontalDivider()
-                        Text("第五步：装饰图调节", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("第五步：调节Deco图饰", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                            Button(onClick = { iconViewModel.loadInstalledApps(context); showAppDecoratorDialog = true }) { Text("App徽章提取", fontSize = 11.sp) }
-                            Button(onClick = { decoratorPhotoLauncher.launch("image/*") }) { Text("📁 外部图片", fontSize = 11.sp) }
-                            OutlinedButton(onClick = { heroViewModel.decoratorBitmap = null; Toast.makeText(context, "已清空挂件", Toast.LENGTH_SHORT).show() }) { Text("❌ 不使用", fontSize = 11.sp) }
+                            Button(onClick = { iconViewModel.loadInstalledApps(context); showAppDecoratorDialog = true }) { Text("App图标提取", fontSize = 11.sp) }
+                            Button(onClick = { decoratorPhotoLauncher.launch("image/*") }) { Text("用户自定义", fontSize = 11.sp) }
+                            OutlinedButton(onClick = { heroViewModel.decoratorBitmap = null; Toast.makeText(context, "已清空图饰", Toast.LENGTH_SHORT).show() }) { Text("不使用", fontSize = 11.sp) }
                         }
                     }
 
@@ -783,8 +782,8 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
     }
 
     if (showBaseCropDialog && tempBasePhotoUri != null) {
-        var cropScale by remember { mutableStateOf(1f) }
-        var cropOffset by remember { mutableStateOf<androidx.compose.ui.geometry.Offset>(androidx.compose.ui.geometry.Offset.Zero) }
+        var cropScale by remember { mutableFloatStateOf(1f) }
+        var cropOffset by remember { mutableStateOf(Offset.Zero) }
         var cropContainerSize by remember { mutableStateOf(IntSize.Zero) }
         val srcBmp = remember(tempBasePhotoUri) { runCatching { val inputStream = context.contentResolver.openInputStream(tempBasePhotoUri!!); BitmapFactory.decodeStream(inputStream) }.getOrNull() }
         Dialog(onDismissRequest = { showBaseCropDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -812,7 +811,7 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
                                 }
                             }
                             showBaseCropDialog = false
-                        }) { Text("确认引入大图", fontWeight = FontWeight.Bold) }
+                        }) { Text("确认导入图片", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
@@ -829,8 +828,8 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
                         2 -> "设置边框立体投影色"
                         3 -> "调整字体正面色"
                         4 -> "设置字体边缘描边色"
-                        5 -> "调配文字外发光幻彩色"
-                        else -> "设置文字专属投影色"
+                        5 -> "调配文字外发光颜色"
+                        else -> "设置文字投影色"
                     }
                     Text(titleText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(12.dp))
@@ -886,7 +885,7 @@ fun HeroGeneratorScreen(iconViewModel: IconGenViewModel, heroViewModel: HeroGenV
         Dialog(onDismissRequest = { showAppDecoratorDialog = false }) {
             Card(modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("选择已有应用图标作为海报装饰物", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("选择已有应用图标作为Deco图饰", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(iconViewModel.installedApps) { app ->
