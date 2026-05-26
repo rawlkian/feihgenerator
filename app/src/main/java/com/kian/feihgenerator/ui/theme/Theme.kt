@@ -36,11 +36,16 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun FEIHGeneratorTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // 设为 false 以强制使用我们自定义的蓝橙红白配色
+    themeMode: Int = 0, // 0: System, 1: Light, 2: Dark
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        1 -> false
+        2 -> true
+        else -> isSystemInDarkTheme()
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current

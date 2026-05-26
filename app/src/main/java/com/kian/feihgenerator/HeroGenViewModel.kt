@@ -293,10 +293,11 @@ class HeroGenViewModel : ViewModel() {
                     // 2. 文本层与装饰挂件物理合并阶段
                     val executeDrawText = {
                         canvas.save()
-                        canvas.translate(targetW / 2f + textTranslateX * previewToFullScale, targetH / 2f + textTranslateY * previewToFullScale)
+                        // 统一坐标：textTranslateX/Y 已经是基于 2600/1600 设计步长的逻辑像素
+                        canvas.translate(targetW / 2f + textTranslateX, targetH / 2f + textTranslateY)
 
                         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            textSize = heroTextSize * (targetH.toFloat() / 1000f) * 1.5f
+                            textSize = heroTextSize // 直接使用逻辑像素大小，对应 1600 高度设计
                             textAlign = Paint.Align.CENTER
                             var flags = Typeface.NORMAL
                             if (textBold && textItalic) flags = Typeface.BOLD_ITALIC
@@ -311,10 +312,10 @@ class HeroGenViewModel : ViewModel() {
                         }
 
                         if (textHasShadow) {
-                            textPaint.setShadowLayer(textShadowRadius * previewToFullScale, textShadowDx * previewToFullScale, textShadowDy * previewToFullScale, textShadowColor.toInt())
+                            textPaint.setShadowLayer(textShadowRadius, textShadowDx, textShadowDy, textShadowColor.toInt())
                         }
                         if (textGlowType == 1) {
-                            textPaint.maskFilter = BlurMaskFilter(textGlowRadius * previewToFullScale, BlurMaskFilter.Blur.OUTER)
+                            textPaint.maskFilter = BlurMaskFilter(textGlowRadius, BlurMaskFilter.Blur.OUTER)
                             textPaint.color = textGlowColor.toInt()
                             drawMultiLineText(canvas, heroText, textPaint)
                             textPaint.maskFilter = null
@@ -325,7 +326,7 @@ class HeroGenViewModel : ViewModel() {
                         }
                         if (textHasStroke) {
                             textPaint.style = Paint.Style.STROKE
-                            textPaint.strokeWidth = textStrokeWidth * previewToFullScale
+                            textPaint.strokeWidth = textStrokeWidth
                             textPaint.color = textStrokeColor.toInt()
                             drawMultiLineText(canvas, heroText, textPaint)
                             textPaint.style = Paint.Style.FILL
@@ -340,10 +341,10 @@ class HeroGenViewModel : ViewModel() {
                     val executeDrawDecorator = {
                         decoratorBitmap?.let { logo ->
                             canvas.save()
-                            canvas.translate(targetW / 2f + decoratorX * previewToFullScale, targetH / 2f + decoratorY * previewToFullScale)
+                            canvas.translate(targetW / 2f + decoratorX, targetH / 2f + decoratorY)
                             canvas.rotate(decoratorRotation)
-                            val lW = logo.width * decoratorScale * previewToFullScale
-                            val lH = logo.height * decoratorScale * previewToFullScale
+                            val lW = logo.width * decoratorScale
+                            val lH = logo.height * decoratorScale
                             val logoRect = android.graphics.RectF(-lW / 2f, -lH / 2f, lW / 2f, lH / 2f)
                             canvas.drawBitmap(logo, null, logoRect, imgPaint)
                             canvas.restore()
